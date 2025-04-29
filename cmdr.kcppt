@@ -23,7 +23,7 @@
     "lora": null,
     "mmproj": "",
     "model": "",
-    "model_param": "https://huggingface.co/bartowski/c4ai-command-r7b-12-2024-GGUF/blob/main/c4ai-command-r7b-12-2024-Q6_K.gguf?download=true",
+    "model_param": "https://huggingface.co/bartowski/c4ai-command-r7b-12-2024-GGUF/blob/main/c4ai-command-r7b-12-2024-Q6_K.gguf",
     "multiuser": 8,
     "noavx2": false,
     "noblas": false,
