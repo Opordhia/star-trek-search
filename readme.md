@@ -2,7 +2,7 @@
 
 Chunks each document in a directory and sends to an LLM for processing.
 
-![Screenshot](sts.png)
+![Screenshot](sts1.png)
 
 ### Prerequisites
 
@@ -34,5 +34,5 @@ Chunks each document in a directory and sends to an LLM for processing.
 	```
 5. Open a new console and run:
     ```bash
-	python3 sts.py  --task custom --custom-prompt "Does this chunk contain a speech from Carmack?" --directory ./data
+	python3 sts.py  --prompt "Does this chunk contain a speech from Carmack?" --directory ./data
     ```	
