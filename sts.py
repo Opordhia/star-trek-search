@@ -23,14 +23,7 @@ class ChunkingProcessor:
                  max_chunk_length: int,
                  api_password: Optional[str] = None,
                  max_total_chunks: int = 1000):
-        """ Initialize the chunking processor
-        
-        Args:
-            api_url: URL to the KoboldAPI server
-            max_chunk_length: Maximum token length for a single chunk
-            api_password: Optional API password/key
-            max_total_chunks: Maximum number of chunks to process
-        """
+
         if max_chunk_length <= 0:
             raise ValueError("max_chunk_length must be positive")
             
@@ -93,12 +86,6 @@ class ChunkingProcessor:
     
     def chunk_text(self, content: str) -> List[Tuple[str, int]]:
         """ Split content into chunks using natural breakpoints
-        
-        Args:
-            content: The text content to chunk
-            
-        Returns:
-            List of (chunk_text, token_count) tuples
         """
         if not content:
             return []
@@ -134,12 +121,6 @@ class ChunkingProcessor:
 
     def _get_chunk(self, content: str) -> str:
         """ Get appropriately sized chunk using natural breaks
-        
-        Args:
-            content: Text content to chunk
-            
-        Returns:
-            A chunk of text within token limits
         """
         total_tokens = self.count_tokens(content)
         if total_tokens < self.max_chunk:
@@ -165,12 +146,6 @@ class ChunkingProcessor:
 
     def chunk_file(self, file_path) -> Tuple[List[Tuple[str, int]], Dict]:
         """ Chunk text from file
-        
-        Args:
-            file_path: Path to text file (str or Path object)
-            
-        Returns:
-            Tuple of (chunks with token counts, file metadata)
         """
         extractor = Extractor()
         extractor = extractor.set_extract_string_max_length(100000000)
@@ -188,16 +163,9 @@ class SSEProcessingClient:
     """ Client for processing chunks with OpenAI-compatible endpoints via SSE streaming """
     
     def __init__(self, api_url: str, api_password: Optional[str] = None):
-        """ Initialize the processing client
-        
-        Args:
-            api_url: URL to the OpenAI-compatible API
-            api_password: Optional API key/password
-        """
         self.api_url = api_url
         self.api_password = api_password
         
-        # Ensure API URL ends with correct endpoint for OpenAI compatibility
         if not self.api_url.endswith('/v1/chat/completions'):
             self.api_url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
             
@@ -216,21 +184,7 @@ class SSEProcessingClient:
                        top_k: int = 0,
                        rep_pen: float = 1.0,
                        min_p: float = 0.05) -> Dict:
-        """ Create the API payload with standard parameters
         
-        Args:
-            instruction: Instruction text for the model
-            content: Content text to process
-            max_tokens: Maximum tokens to generate
-            temperature: Temperature parameter
-            top_p: Top-p parameter
-            top_k: Top-k parameter
-            rep_pen: Repetition penalty
-            min_p: Minimum p parameter
-            
-        Returns:
-            Dictionary payload for the API
-        """
         system_content = "You are a helpful assistant."
         
         combined_content = f"<START_TEXT>{content}<END_TEXT>\n{instruction}"
@@ -253,15 +207,6 @@ class SSEProcessingClient:
                          max_tokens: int = 2048,
                          temperature: float = 0.2) -> str:
         """ Process a single chunk with streaming output
-        
-        Args:
-            instruction: Instruction for processing
-            content: Text content to process
-            max_tokens: Maximum tokens to generate
-            temperature: Generation temperature
-            
-        Returns:
-            Generated text
         """
         payload = self._create_payload(
             instruction=instruction,
@@ -335,116 +280,26 @@ class SSEProcessingClient:
 
 
 class TextProcessor:
-    """ Handles processing of text documents with KoboldAPI """
     
     def __init__(self, api_url: str, 
                  max_chunk_size: int = 4096,
                  api_password: Optional[str] = None):
-        """ Initialize the text processor
-        
-        Args:
-            api_url: URL to the KoboldAPI server
-            max_chunk_size: Maximum chunk size in tokens
-            api_password: Optional API key/password
-        """
         self.api_url = api_url
         self.api_password = api_password
-        self.task_configs = {
-            'translate': {
-                'chunk_ratio': 0.45,
-                'instruction_template': (
-                    "Translate the text into {language}. "
-                    "Maintain linguistic flourish and authorial style."
-                )
-            },
-            'summary': {
-                'chunk_ratio': 0.8,
-                'instruction_template': (
-                    "Extract the key points and themes from the text "
-                    "without developing conclusions. "
-                    "Be thorough but concise."
-                )
-            },
-            'correct': {
-                'chunk_ratio': 0.45,
-                'instruction_template': (
-                    "Correct any grammar, spelling, and style errors. "
-                    "Preserve the original meaning and style."
-                )
-            },
-            'distill': {
-                'chunk_ratio': 0.8,
-                'instruction_template': (
-                    "Rewrite the text to be concise without losing meaning."
-                )
-            },
-            'custom': {
-                'chunk_ratio': 0.6,  # Default ratio for custom prompts
-                'instruction_template': "{prompt}"  # Will be filled with custom prompt
-            }
-        }
-        
-        # Initialize the chunking processor
         self.chunker = ChunkingProcessor(
             api_url=api_url,
             max_chunk_length=max_chunk_size,
             api_password=api_password
         )
         
-        # Use SSE processing for streaming output
         self.processor = SSEProcessingClient(
             api_url=api_url,
             api_password=api_password
         )
         
-    def _get_task_config(self, task: str, language: str = "English", custom_prompt: str = None) -> dict:
-        """ Get configuration for specified task
+    async def process_text(self, file_path, prompt):
         
-        Args:
-            task: Processing task name
-            language=args.language,
-            max_chunk_size=args.max_chunk_size,
-            api_password=args.api_password,
-            custom_prompt=args.custom_prompt,
-            output_to_console=output_to_console
-        ): Target language for translation
-            custom_prompt: Custom instruction prompt for 'custom' task
-            
-        Returns:
-            Task configuration dictionary
-        """
-        if task not in self.task_configs:
-            raise ValueError(f"Unknown task: {task}")
-            
-        config = self.task_configs[task].copy()
-        config['chunk_size'] = int(self.chunker.api_max_context * config['chunk_ratio'])
-        
-        if task == 'custom' and custom_prompt:
-            config['instruction'] = config['instruction_template'].format(prompt=custom_prompt)
-        else:
-            config['instruction'] = config['instruction_template'].format(language=language)
-            
-        return config
-    
-    async def process_text(self, task: str, file_path: Union[str, Path], 
-                         language: str = "English", custom_prompt: str = None) -> Tuple[List[str], Dict]:
-        """ Process text document with specified task
-        
-        Args:
-            task: Processing task name
-            file_path: Path to the text file
-            language: Target language for translation
-            custom_prompt: Custom prompt for 'custom' task
-            
-        Returns:
-            Tuple of (results, metadata)
-        """
-        task_config = self._get_task_config(task, language, custom_prompt)
-        
-        # Update the chunker's max size based on the task
-        self.chunker.max_chunk = task_config['chunk_size']
-        
-        # Chunk the file
+        self.chunker.max_chunk = int(self.chunker.api_max_context * 0.6)
         chunks, metadata = self.chunker.chunk_file(file_path)
         
         print(f"\nProcessing {len(chunks)} chunks...")
@@ -454,7 +309,7 @@ class TextProcessor:
             print(f"\nChunk {i}/{len(chunks)} ({tokens} tokens):")
             try:
                 result = await self.processor.process_chunk(
-                    instruction=task_config['instruction'],
+                    instruction=prompt,
                     content=chunk
                 )
                 results.append(result)
@@ -465,9 +320,7 @@ class TextProcessor:
         # Update metadata
         metadata.update({
             'processing_time': datetime.now().isoformat(),
-            'task': task,
             'chunks_processed': len(chunks),
-            'language': language
         })
         
         return results, metadata
@@ -485,7 +338,6 @@ def write_output(output_path: str, results: List[str], metadata: Dict) -> None:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(f"File: {metadata.get('resourceName', 'Unknown')}\n")
             f.write(f"Type: {metadata.get('Content-Type', 'Unknown')}\n")
-            f.write(f"Task: {metadata.get('task', 'Unknown')}\n")
             f.write(f"Processed: {metadata.get('processing_time', 'Unknown')}\n")
             f.write(f"Chunks: {metadata.get('chunks_processed', 0)}\n\n")
             
@@ -498,32 +350,20 @@ def write_output(output_path: str, results: List[str], metadata: Dict) -> None:
         print(f"Error writing output file: {str(e)}")
 
 
-async def process_file(api_url: str, input_path: Path, task: str, 
+async def process_file(api_url: str, input_path: Path, 
                       output_path: Optional[str] = None,
-                      language: str = "English", 
                       max_chunk_size: int = 4096,
                       api_password: Optional[str] = None,
-                      custom_prompt: Optional[str] = None,
+                      prompt: Optional[str] = None,
                       output_to_console: bool = False) -> int:
     """ Process a text file and save results
     
-    Args:
-        api_url: URL to the KoboldAPI server
-        input_path: Path to input file
-        task: Processing task name
-        output_path: Path for output file (defaults to input + task)
-        language: Target language for translation
-        max_chunk_size: Maximum chunk size in tokens
-        api_password: Optional API key/password
-        custom_prompt: Custom prompt for the 'custom' task
-        output_to_console: Whether to only output to console (no file output)
-        
     Returns:
         Exit code (0 for success, 1 for error)
     """
     if not output_path and not output_to_console:
         input_stem = Path(input_path).stem
-        output_path = f"{input_stem}_{task}.txt"
+        output_path = f"{input_stem}_processed.txt"
         
     try:
         processor = TextProcessor(
@@ -533,10 +373,8 @@ async def process_file(api_url: str, input_path: Path, task: str,
         )
         
         results, metadata = await processor.process_text(
-            task=task, 
             file_path=input_path, 
-            language=language,
-            custom_prompt=custom_prompt
+            prompt=prompt
         )
         
         # Only write to file if output_to_console is False
@@ -551,22 +389,11 @@ async def process_file(api_url: str, input_path: Path, task: str,
         return 1
 
 
-async def process_directory(api_url: str, directory_path: Path, task: str,
-                           language: str = "English",
+async def process_directory(api_url: str, directory_path: Path,
                            max_chunk_size: int = 4096,
                            api_password: Optional[str] = None,
-                           custom_prompt: Optional[str] = None) -> int:
-    """ Process all files in a directory with the specified task
-    
-    Args:
-        api_url: URL to the KoboldAPI server
-        directory_path: Path to directory containing files to process
-        task: Processing task name
-        language: Target language for translation
-        max_chunk_size: Maximum chunk size in tokens
-        api_password: Optional API key/password
-        custom_prompt: Custom prompt for the 'custom' task
-        
+                           prompt: Optional[str] = None) -> int:
+    """     
     Returns:
         Exit code (0 for success, non-zero for error)
     """
@@ -574,14 +401,12 @@ async def process_directory(api_url: str, directory_path: Path, task: str,
         print(f"Error: '{directory_path}' is not a directory")
         return 1
         
-    # Create a processor instance to reuse
     processor = TextProcessor(
         api_url=api_url,
         max_chunk_size=max_chunk_size,
         api_password=api_password
     )
     
-    # Get list of files in the directory
     files = [f for f in os.listdir(directory_path) if os.path.isfile(os.path.join(directory_path, f))]
     
     if not files:
@@ -591,29 +416,24 @@ async def process_directory(api_url: str, directory_path: Path, task: str,
     print(f"Found {len(files)} files in '{directory_path}'")
     successful = 0
     
-    # Process each file
     for i, file in enumerate(files, 1):
         file_path = os.path.join(directory_path, file)
         print(f"\n[{i}/{len(files)}] Processing: {file}")
         
         try:
-            # Get chunks and metadata
             chunks, metadata = processor.chunker.chunk_file(file_path)
             
             if not chunks:
                 print(f"  No text content extracted from {file}")
                 continue
                 
-            # Get task config
-            task_config = processor._get_task_config(task, language, custom_prompt)
-            
             # Process each chunk
             results = []
             for j, (chunk, tokens) in enumerate(chunks, 1):
                 print(f"  Chunk {j}/{len(chunks)} ({tokens} tokens):")
                 try:
                     result = await processor.processor.process_chunk(
-                        instruction=task_config['instruction'],
+                        instruction=prompt,
                         content=chunk
                     )
                     results.append(result)
@@ -641,12 +461,6 @@ async def main():
         help='Input text file path or directory'
     )
     parser.add_argument(
-        '--task',
-        required=True,
-        choices=['summary', 'translate', 'correct', 'distill', 'custom'],
-        help='Processing task to perform'
-    )
-    parser.add_argument(
         '--api-url',
         default='http://localhost:5001',
         help='KoboldAPI URL'
@@ -655,11 +469,6 @@ async def main():
         '--api-password',
         default='',
         help='API key/password'
-    )
-    parser.add_argument(
-        '--language',
-        default='English',
-        help='Target language for translation'
     )
     parser.add_argument(
         '--output',
@@ -673,9 +482,9 @@ async def main():
         help='Maximum token size for a chunk'
     )
     parser.add_argument(
-        '--custom-prompt',
+        '--prompt',
         default=None,
-        help='Custom prompt for the "custom" task'
+        help='Prompt'
     )
     parser.add_argument(
         '--directory',
@@ -685,9 +494,8 @@ async def main():
     
     args = parser.parse_args()
     
-    # Ensure custom prompt is provided when task is 'custom'
-    if args.task == 'custom' and not args.custom_prompt:
-        print("Error: --custom-prompt is required when task is 'custom'")
+    if not args.prompt:
+        print("Error: --prompt is required")
         return 1
     
     # Process as directory if --directory flag is set or if input is a directory
@@ -697,24 +505,20 @@ async def main():
         return await process_directory(
             api_url=args.api_url,
             directory_path=args.input,
-            task=args.task,
-            language=args.language,
             max_chunk_size=args.max_chunk_size,
             api_password=args.api_password,
-            custom_prompt=args.custom_prompt
+            prompt=args.prompt
         )
     else:
         # Process as single file
-        output_to_console = args.task == 'custom' and not args.output
+        output_to_console = True
         return await process_file(
             api_url=args.api_url,
             input_path=args.input,
-            task=args.task,
             output_path=args.output,
-            language=args.language,
             max_chunk_size=args.max_chunk_size,
             api_password=args.api_password,
-            custom_prompt=args.custom_prompt,
+            prompt=args.prompt,
             output_to_console=output_to_console
         )
         
