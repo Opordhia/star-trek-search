@@ -60,7 +60,7 @@ class SearchRequest(BaseModel):
         default=True, description="Whether to search recursively in subdirectories."
     )
     prompt: str = Field(
-        default="""Is this chunk relevant to the query? Rate the relevance from 0 being completely irrelevant to 10 being an exact answer. If it is above 5 use the chunk to remark with a brief summary the relevant data and attempt to answer the query with it or relate the important details. If it is below 5, remark ONLY that it is irrelevant. Respond in a JSON object like so ```json {'Relevance': int, 'Remark': str}```""", description="Prompt"
+        default="""Is this chunk relevant to the query? Rate the relevance from 0 being completely irrelevant to 10 being an exact answer. If it is above 5 use the chunk to remark with a brief summary the relevant data and attempt to answer the query with it or relate the important details. If it is below 5, remark ONLY that it is irrelevant. Respond like so: relevance: int, remark: str""", description="Prompt"
     )
 
 class SearchResult(BaseModel):
@@ -417,15 +417,17 @@ async def process_file(api_url: str, input_path: Path,
                         score = 0.8
                     else:
                         score = 0.0
-            
-            formatted_results.append({
-                "file_path": str(input_path),
-                "chunk_index": i,
-                "content": result,
-                "score": score,
-                "metadata": metadata.copy()
-            })
-        return formatted_results
+            if score < 5:
+                 return []
+            else:
+                formatted_results.append({
+                    "file_path": str(input_path),
+                    "chunk_index": i,
+                    "content": result,
+                    "score": score,
+                    "metadata": metadata.copy()
+                })
+            return formatted_results
     except Exception as e:
         print(f"Error: {e}")
         return []
