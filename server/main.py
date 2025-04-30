@@ -22,10 +22,10 @@ from chunker_regex import chunk_regex
 from config import ALLOWED_DIRECTORIES
 
 
-INSTRUCTION = """Review this chunk and determine if has information which will help answer the query. The goal is not to answer the query, but to return information to be cited as an athoritative source.
+INSTRUCTION = """Review this chunk and determine if has information which will help answer the query. The goal is not to answer the query, but to return information to be cited as an authoritative source.
 
 There are two parts to this task:
-1. Evaluate the revelance of the data in answering the query. Score revelance on a scale of 0 to 10 and return only the number
+1. Evaluate the relevance of the data in answering the query. Score revelance on a scale of 0 to 10 and return only the number
 2. If the score is above 5, return the all information that is relevant to the query as items in an array. ONLY the text in the document is to be returned as this will act as the source of the information which another agent will use to answer the question.
 
 Respond with ONLY a JSON object as follows: {relevance_score: int, source_text: [str]}"""
