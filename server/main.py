@@ -76,7 +76,6 @@ class SearchResponse(BaseModel):
     
 class ChunkingProcessor:
     """ Handles splitting content into manageable chunks using natural breaks """
-
     def __init__(self, api_url: str, 
                  max_chunk_length: int,
                  api_password: Optional[str] = None,
@@ -91,18 +90,15 @@ class ChunkingProcessor:
         self.headers = {
             "Content-Type": "application/json",
         }
-        
         if api_password:
             self.headers["Authorization"] = f"Bearer {api_password}"
-    
-        # Verify API and get max context length if needed
         self.api_max_context = self._get_max_context_length()
         if self.max_chunk > self.api_max_context // 2:
             print(f"Warning: Reducing chunk size to fit model context window")
             self.max_chunk = self.api_max_context // 2
         
     def _get_max_context_length(self) -> int:
-        """ Get the maximum context length from the KoboldAPI """
+        """ Get the maximum context length  """
         try:
             response = requests.get(f"{self.api_url}/props")
             if response.status_code == 200:
@@ -117,7 +113,7 @@ class ChunkingProcessor:
             return 8192
             
     def count_tokens(self, text: str) -> int:
-        """ Count tokens in the provided text using KoboldAPI """
+        """ Count tokens in the provided text """
         try:
             payload = {
                 "content": text,
@@ -143,34 +139,28 @@ class ChunkingProcessor:
         """
         if not content:
             return []
-            
         chunks = []
         remaining = content
         chunk_num = 0
         
         while remaining and chunk_num < self.max_total_chunks:
-            # KoboldCPP has max char limit of 50k
             current_section = remaining[:45000]
             remaining = remaining[45000:]
-            
             chunk = self._get_chunk(current_section)
             chunk_len = len(chunk)
             
             if chunk_len == 0:
                 continue
-                
             chunk_tokens = self.count_tokens(chunk)
             chunks.append((chunk, chunk_tokens))
             
             # Update remaining with what wasn't included in this chunk
             remaining = current_section[len(chunk):].strip() + remaining
-
             chunk_num += 1
             print(f"Created chunk {chunk_num}: {chunk_tokens} tokens")
             
         if remaining and chunk_num >= self.max_total_chunks:
             raise ValueError(f"Text exceeded maximum of {self.max_total_chunks} chunks")
-            
         return chunks
 
     def _get_chunk(self, content: str) -> str:
@@ -195,7 +185,6 @@ class ChunkingProcessor:
                 break
             chunks.append(chunk)
             current_size += chunk_size
-        
         return ''.join(chunks)
 
     def chunk_file(self, file_path) -> Tuple[List[Tuple[str, int]], Dict]:
@@ -222,12 +211,10 @@ class SSEProcessingClient:
         
         if not self.api_url.endswith('/v1/chat/completions'):
             self.api_url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
-            
         self.headers = {
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
-        
         if api_password:
             self.headers["Authorization"] = f"Bearer {api_password}"
     
@@ -240,9 +227,7 @@ class SSEProcessingClient:
                        min_p: float = 0.05) -> Dict:
         
         system_content = "You are a helpful assistant."
-        
         combined_content = f"<START_TEXT>{content}<END_TEXT>\n{instruction}"
-        
         return {
             "messages": [
                 {"role": "system", "content": system_content},
@@ -268,10 +253,8 @@ class SSEProcessingClient:
             max_tokens=max_tokens,
             temperature=temperature
         )
-        
         result = []
         partial_line = ""
-        
         try:
             response = requests.post(
                 self.api_url,
@@ -279,7 +262,6 @@ class SSEProcessingClient:
                 headers=self.headers,
                 stream=True
             )
-            
             for line in response.iter_lines():
                 if not line:
                     continue
@@ -322,19 +304,14 @@ class SSEProcessingClient:
                                 result.append(token)
                 except json.JSONDecodeError:
                     continue
-                
             if partial_line:
                 print(partial_line)
-                
-            return ''.join(result)
-                
+            return ''.join(result)   
         except Exception as e:
             print(f"Error in API call: {str(e)}")
             return ""
 
-
 class TextProcessor:
-    
     def __init__(self, api_url: str, 
                  max_chunk_size: int = 4096,
                  api_password: Optional[str] = None):
@@ -345,14 +322,11 @@ class TextProcessor:
             max_chunk_length=max_chunk_size,
             api_password=api_password
         )
-        
         self.processor = SSEProcessingClient(
             api_url=api_url,
             api_password=api_password
         )
-        
     async def process_text(self, file_path, prompt):
-        
         self.chunker.max_chunk = int(self.chunker.api_max_context * 0.6)
         chunks, metadata = self.chunker.chunk_file(file_path)
         
@@ -370,19 +344,14 @@ class TextProcessor:
             except Exception as e:
                 print(f"\nError processing chunk {i}: {e}")
                 results.append(f"[Error processing chunk {i}]")
-                
-        # Update metadata
         metadata.update({
             'processing_time': datetime.now().isoformat(),
             'chunks_processed': len(chunks),
         })
-        
         return results, metadata
-
 
 def write_output(output_path: str, results: List[str], metadata: Dict) -> None:
     """ Write processing results to a file
-    
     Args:
         output_path: Path to output file
         results: List of processed text chunks
@@ -397,12 +366,10 @@ def write_output(output_path: str, results: List[str], metadata: Dict) -> None:
             
             for i, result in enumerate(results, 1):
                 f.write(f"--- Chunk {i} ---\n\n")
-                f.write(f"{result}\n\n")
-                
+                f.write(f"{result}\n\n")   
         print(f"\nOutput written to: {output_path}")
     except Exception as e:
         print(f"Error writing output file: {str(e)}")
-
 
 async def process_file(api_url: str, input_path: Path, 
                       output_path: Optional[str] = None,
@@ -411,21 +378,17 @@ async def process_file(api_url: str, input_path: Path,
                       prompt: Optional[str] = None,
                       output_to_console: bool = False) -> List[Dict]:
     """ Process a text file and save results
-    
-    Returns:
-        List of results with metadata
     """
     if not output_path and not output_to_console:
         input_stem = Path(input_path).stem
         output_path = f"{input_stem}_processed.txt"
-        
+
     try:
         processor = TextProcessor(
             api_url=api_url,
             max_chunk_size=max_chunk_size,
             api_password=api_password
         )
-        
         results, metadata = await processor.process_text(
             file_path=input_path, 
             prompt=prompt
@@ -439,9 +402,7 @@ async def process_file(api_url: str, input_path: Path,
         # Format results for return
         formatted_results = []
         for i, result in enumerate(results):
-            # Extract a score from the result text (simplified - you might want to adjust this)
-            # Here we're looking for a score pattern like "Relevance: 8/10" or just extracting
-            # a number if it exists
+            # Extract a score from the result text
             score_match = re.search(r"relevance:?\s*(\d+(?:\.\d+)?)/10", result.lower())
             if score_match:
                 score = float(score_match.group(1)) / 10.0
@@ -455,7 +416,7 @@ async def process_file(api_url: str, input_path: Path,
                     if "relevant" in result.lower():
                         score = 0.8
                     else:
-                        score = 0.4
+                        score = 0.0
             
             formatted_results.append({
                 "file_path": str(input_path),
@@ -464,9 +425,7 @@ async def process_file(api_url: str, input_path: Path,
                 "score": score,
                 "metadata": metadata.copy()
             })
-            
         return formatted_results
-        
     except Exception as e:
         print(f"Error: {e}")
         return []
@@ -478,8 +437,7 @@ async def process_directory(api_url: str, directory_path: Path,
                            prompt: Optional[str] = None,
                            recursive: bool = True) -> List[Dict]:
     """     
-    Returns:
-        List of results with metadata
+    Returns a list of results with metadata
     """
     if not os.path.isdir(directory_path):
         print(f"Error: '{directory_path}' is not a directory")
@@ -500,7 +458,6 @@ async def process_directory(api_url: str, directory_path: Path,
     else:
         files = [os.path.join(directory_path, f) for f in os.listdir(directory_path) 
                 if os.path.isfile(os.path.join(directory_path, f))]
-    
     if not files:
         print(f"No files found in '{directory_path}'")
         return []
@@ -510,7 +467,6 @@ async def process_directory(api_url: str, directory_path: Path,
     
     for i, file_path in enumerate(files, 1):
         print(f"\n[{i}/{len(files)}] Processing: {file_path}")
-        
         try:
             file_results = await process_file(
                 api_url=api_url,
@@ -520,15 +476,12 @@ async def process_directory(api_url: str, directory_path: Path,
                 prompt=prompt,
                 output_to_console=True
             )
-            
             all_results.extend(file_results)
-                
         except Exception as e:
             print(f"  Error processing file {file_path}: {e}")
     
     # Sort results by score in descending order
     all_results.sort(key=lambda x: x["score"], reverse=True)
-    
     print(f"\nProcessed {len(all_results)} chunks across {len(files)} files.")
     return all_results
 
@@ -539,10 +492,7 @@ async def star_trek_search(data: SearchRequest = Body(...)):
     max_chunk_size = 8192
     api_password = ""
     prompt = data.prompt + "\n<QUERY>" + data.search_query + "</QUERY>\n"
-    base_path = ALLOWED_DIRECTORIES[0]
-    
-    #if not base_path.is_dir():
-    #    raise HTTPException(status_code=400, detail="Provided path is not a directory")
+    base_path = ALLOWED_DIRECTORIES[0] #Only the first directory in the list is used
 
     results = await process_directory(
         api_url=api_url,
@@ -552,8 +502,7 @@ async def star_trek_search(data: SearchRequest = Body(...)):
         prompt=prompt,
         recursive=data.recursive
     )
-    
-    # Convert to Pydantic models
+
     search_results = []
     for result in results:
         search_results.append(SearchResult(
@@ -563,16 +512,14 @@ async def star_trek_search(data: SearchRequest = Body(...)):
             score=result["score"],
             metadata=result["metadata"]
         ))
-    
+        
     metadata = {
         "total_results": len(search_results),
         "search_query": data.search_query,
         "search_path": base_path,
         "timestamp": datetime.now().isoformat()
     }
-    
     return SearchResponse(results=search_results, metadata=metadata)
-        
         
 @app.get("/list_allowed_directories", summary="List access-permitted directories")
 async def list_allowed_directories():
