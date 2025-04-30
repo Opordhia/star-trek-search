@@ -60,7 +60,7 @@ class SearchRequest(BaseModel):
         default=True, description="Whether to search recursively in subdirectories."
     )
     prompt: str = Field(
-        default="Is this chunk relevant to the query?", description="Prompt"
+        default="""Is this chunk relevant to the query? Rate the relevance from 0 being completely irrelevant to 10 being an exact answer. If it is above 5 use the chunk to remark with a brief summary the relevant data and attempt to answer the query with it or relate the important details. If it is below 5, remark ONLY that it is irrelevant. Respond in a JSON object like so ```json {'Relevance': int, 'Remark': str}```""", description="Prompt"
     )
 
 class SearchResult(BaseModel):
@@ -491,7 +491,7 @@ async def star_trek_search(data: SearchRequest = Body(...)):
     api_url = "http://localhost:5002"
     max_chunk_size = 8192
     api_password = ""
-    prompt = data.prompt + "\n<QUERY>" + data.search_query + "</QUERY>\n"
+    prompt = "\n<QUERY>" + data.search_query + "</QUERY>\n" + data.prompt
     base_path = ALLOWED_DIRECTORIES[0] #Only the first directory in the list is used
 
     results = await process_directory(
